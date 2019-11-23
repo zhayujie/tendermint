@@ -35,11 +35,19 @@ type BlockExecutor struct {
 	logger log.Logger
 }
 
+/*
+ * @Author: zyj
+ * @Desc: single instance
+ * @Date: 19.11.03
+ */
+
+
 // NewBlockExecutor returns a new BlockExecutor with a NopEventBus.
 // Call SetEventBus to provide one.
 func NewBlockExecutor(db dbm.DB, logger log.Logger, proxyApp proxy.AppConnConsensus,
 	mempool types.Mempool, evpool types.EvidencePool) *BlockExecutor {
-	return &BlockExecutor{
+
+		blockExec := &BlockExecutor{
 		db:       db,
 		proxyApp: proxyApp,
 		eventBus: types.NopEventBus{},
@@ -47,6 +55,14 @@ func NewBlockExecutor(db dbm.DB, logger log.Logger, proxyApp proxy.AppConnConsen
 		evpool:   evpool,
 		logger:   logger,
 	}
+	/*
+	 * @Author: zyj
+	 * @Desc: transfer the db reference
+	 * @Date: 19.11.09
+	 */
+	InitAccountDB(blockExec)
+
+	return blockExec
 }
 
 // SetEventBus - sets the event bus for publishing block related events.
@@ -221,6 +237,16 @@ func execBlockOnProxyApp(logger log.Logger, proxyAppConn proxy.AppConnConsensus,
 		if err := proxyAppConn.Error(); err != nil {
 			return nil, err
 		}
+
+		/*
+         * @Author: zyj
+         * @Desc: update state
+         * @Date: 19.11.10
+         */
+        accountLog := NewAccountLog(tx)
+		if accountLog != nil {
+			accountLog.Save()
+		}
 	}
 
 	// End block
@@ -380,3 +406,10 @@ func ExecCommitBlock(appConnConsensus proxy.AppConnConsensus, block *types.Block
 	// ResponseCommit has no error or log, just data
 	return res.Data, nil
 }
+
+
+
+
+
+
+

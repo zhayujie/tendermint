@@ -3,6 +3,7 @@ package mempool
 import (
 	"bytes"
 	"container/list"
+	"github.com/tendermint/tendermint/state"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -208,6 +209,21 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 	mem.cache.Push(tx)
 	// END CACHE
 
+	/*
+     * @Author: zyj
+     * @Desc: check tx
+     * @Date: 19.11.10
+     */
+    accountLog := state.NewAccountLog(tx)
+    if accountLog == nil {
+    	return errors.New("交易解析失败")
+	}
+    checkRes := accountLog.Check()
+    if !checkRes {
+    	return errors.New("不合法的交易")
+	}
+
+
 	// WAL
 	if mem.wal != nil {
 		// TODO: Notify administrators when WAL fails
@@ -221,7 +237,6 @@ func (mem *Mempool) CheckTx(tx types.Tx, cb func(*abci.Response)) (err error) {
 		}
 	}
 	// END WAL
-
 	// NOTE: proxyAppConn may error if tx buffer is full
 	if err = mem.proxyAppConn.Error(); err != nil {
 		return err

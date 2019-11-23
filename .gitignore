@@ -18,6 +18,6 @@ coverage.txt
 docs/_build
 docs/tools
 *.log
-
+.idea
 scripts/wal2json/wal2json
 scripts/cutWALUntil/cutWALUntil
