@@ -169,9 +169,15 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 		cmn.PanicSanity("BlockStore can only save a non-nil block")
 	}
 	height := block.Height
-	if g, w := height, bs.Height()+1; g != w {
-		cmn.PanicSanity(cmn.Fmt("BlockStore can only save contiguous blocks. Wanted %v, got %v", w, g))
-	}
+
+	/*
+     * @Author: zyj
+     * @Desc: 移除区块连续性判断
+     * @Date: 19.11.24
+     */
+	//if g, w := height, bs.Height()+1; g != w {
+	//	cmn.PanicSanity(cmn.Fmt("BlockStore can only save contiguous blocks. Wanted %v, got %v", w, g))
+	//}
 	if !blockParts.IsComplete() {
 		cmn.PanicSanity(cmn.Fmt("BlockStore can only save complete block part sets"))
 	}
@@ -208,9 +214,14 @@ func (bs *BlockStore) SaveBlock(block *types.Block, blockParts *types.PartSet, s
 }
 
 func (bs *BlockStore) saveBlockPart(height int64, index int, part *types.Part) {
-	if height != bs.Height()+1 {
-		cmn.PanicSanity(cmn.Fmt("BlockStore can only save contiguous blocks. Wanted %v, got %v", bs.Height()+1, height))
-	}
+    /*
+     * @Author: zyj
+     * @Desc: 移除区块连续性判断
+     * @Date: 19.11.24
+     */
+	//if height != bs.Height()+1 {
+	//	cmn.PanicSanity(cmn.Fmt("BlockStore can only save contiguous blocks. Wanted %v, got %v", bs.Height()+1, height))
+	//}
 	partBytes := wire.BinaryBytes(part)
 	bs.db.Set(calcBlockPartKey(height, index), partBytes)
 }

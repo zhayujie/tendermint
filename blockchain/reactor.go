@@ -1,21 +1,21 @@
 package blockchain
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"reflect"
-	"sync"
-	"time"
+    "bytes"
+    "errors"
+    "fmt"
+    "reflect"
+    "sync"
+    "time"
 
-	wire "github.com/tendermint/go-wire"
+    "github.com/tendermint/go-wire"
 
-	cmn "github.com/tendermint/tmlibs/common"
-	"github.com/tendermint/tmlibs/log"
+    cmn "github.com/tendermint/tmlibs/common"
+    "github.com/tendermint/tmlibs/log"
 
-	"github.com/tendermint/tendermint/p2p"
-	sm "github.com/tendermint/tendermint/state"
-	"github.com/tendermint/tendermint/types"
+    "github.com/tendermint/tendermint/p2p"
+    sm "github.com/tendermint/tendermint/state"
+    "github.com/tendermint/tendermint/types"
 )
 
 const (
@@ -190,7 +190,31 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 	case *bcStatusResponseMessage:
 		// Got a peer status. Unverified.
 		bcR.pool.SetPeerHeight(src.ID(), msg.Height)
-	default:
+	/*
+     * @Author: zyj
+     * @Desc: 增加快照请求和响应的逻辑处理
+     * @Date: 19.11.24
+     */
+    case *bcSnapshotRequestMessage:
+        bcR.Logger.Error("收到快照请求! 现在发送快照")
+        src.TrySend(BlockchainChannel,
+            struct{ BlockchainMessage }{&bcSnapshotResponseMessage{bcR.store.Height(), []byte("snapshot")}})
+
+    case *bcSnapshotResponseMessage:
+        bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
+        // 更新当前区块高度为快照版本
+        if msg.Version > 0 && msg.Version < 0x7fffffff {
+            bcR.store.height = msg.Version
+            // 更新pool中的高度为当前高度+1
+            bcR.pool.height = bcR.store.height + 1
+            bcR.initialState.LastBlockHeight = bcR.store.height
+            // 修改consensus模块中的区块高度
+            //cs := consensus.GetConsensusState()
+            //cs.Height = bcR.store.height
+        }
+    /* ---------- zyj change --------- */
+
+    default:
 		bcR.Logger.Error(cmn.Fmt("Unknown message type %v", reflect.TypeOf(msg)))
 	}
 }
@@ -235,6 +259,19 @@ FOR_LOOP:
 			if peer == nil {
 				continue FOR_LOOP // Peer has since been disconnected.
 			}
+            /*
+             * @Author: zyj
+             * @Desc: 增加快照请求发送逻辑，当requestsCh通道中高度为-1时触发
+             * @Date: 19.11.24
+             */
+            if request.Height == -1 {
+                bcR.Logger.Error(cmn.Fmt("收到同步快照请求from: %v", request.PeerID))
+                msg := &bcSnapshotRequestMessage{}
+                peer.TrySend(BlockchainChannel, struct{ BlockchainMessage}{msg})
+                continue FOR_LOOP
+            }
+            /* ---------- zyj change --------- */
+
 			msg := &bcBlockRequestMessage{request.Height}
 			queued := peer.TrySend(BlockchainChannel, struct{ BlockchainMessage }{msg})
 			if !queued {
@@ -258,8 +295,13 @@ FOR_LOOP:
 				"outbound", outbound, "inbound", inbound)
 			if bcR.pool.IsCaughtUp() {
 				bcR.Logger.Info("Time to switch to consensus reactor!", "height", height)
+                /*
+                 * @Author: zyj
+                 * @Desc: 更新高度，同步至consensus模块，否则会从高度1开始共识
+                 * @Date: 19.11.24
+                 */
+                state.LastBlockHeight = height - 1
 				bcR.pool.Stop()
-
 				conR := bcR.Switch.Reactor("CONSENSUS").(consensusReactor)
 				conR.SwitchToConsensus(state, blocksSynced)
 
@@ -338,17 +380,30 @@ func (bcR *BlockchainReactor) BroadcastStatusRequest() error {
 //-----------------------------------------------------------------------------
 // Messages
 
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型常量
+ * @Date: 19.11.24
+ */
 const (
 	msgTypeBlockRequest    = byte(0x10)
 	msgTypeBlockResponse   = byte(0x11)
 	msgTypeNoBlockResponse = byte(0x12)
 	msgTypeStatusResponse  = byte(0x20)
 	msgTypeStatusRequest   = byte(0x21)
+    msgTypeSnapshotRequest = byte(0x22)
+    msgTypeSnapshotResponse = byte(0x30)
 )
 
 // BlockchainMessage is a generic message for this reactor.
 type BlockchainMessage interface{}
 
+
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型注册
+ * @Date: 19.11.24
+ */
 var _ = wire.RegisterInterface(
 	struct{ BlockchainMessage }{},
 	wire.ConcreteType{&bcBlockRequestMessage{}, msgTypeBlockRequest},
@@ -356,6 +411,8 @@ var _ = wire.RegisterInterface(
 	wire.ConcreteType{&bcNoBlockResponseMessage{}, msgTypeNoBlockResponse},
 	wire.ConcreteType{&bcStatusResponseMessage{}, msgTypeStatusResponse},
 	wire.ConcreteType{&bcStatusRequestMessage{}, msgTypeStatusRequest},
+    wire.ConcreteType{&bcSnapshotRequestMessage{}, msgTypeSnapshotRequest},
+    wire.ConcreteType{&bcSnapshotResponseMessage{}, msgTypeSnapshotResponse},
 )
 
 // DecodeMessage decodes BlockchainMessage.
@@ -419,3 +476,28 @@ type bcStatusResponseMessage struct {
 func (m *bcStatusResponseMessage) String() string {
 	return cmn.Fmt("[bcStatusResponseMessage %v]", m.Height)
 }
+
+
+//-------------------------------------
+/*
+ * @Author: zyj
+ * @Desc: 增加快照消息类型定义
+ * @Date: 19.11.24
+ */
+type bcSnapshotRequestMessage struct {
+}
+
+func (m *bcSnapshotRequestMessage) String() string {
+    return cmn.Fmt("[bcStatusResponseMessage %v]")
+}
+
+
+type bcSnapshotResponseMessage struct {
+    Version int64
+    Content []byte
+}
+
+func (m *bcSnapshotResponseMessage) String() string {
+    return cmn.Fmt("[bcStatusResponseMessage %v]", m.Version)
+}
+

@@ -114,6 +114,13 @@ type ConsensusState struct {
 	done chan struct{}
 }
 
+/*
+ * @Author: zyj
+ * @Desc: 构造单例模式暴露consensus句柄
+ * @Date: 19.11.24
+ */
+var consensusState *ConsensusState
+
 // NewConsensusState returns a new ConsensusState.
 func NewConsensusState(config *cfg.ConsensusConfig, state sm.State, blockExec *sm.BlockExecutor, blockStore types.BlockStore, mempool types.Mempool, evpool types.EvidencePool) *ConsensusState {
 	cs := &ConsensusState{
@@ -139,8 +146,24 @@ func NewConsensusState(config *cfg.ConsensusConfig, state sm.State, blockExec *s
 	// We do that upon Start().
 	cs.reconstructLastCommit(state)
 	cs.BaseService = *cmn.NewBaseService(nil, "ConsensusState", cs)
+    /*
+     * @Author: zyj
+     * @Desc: 传递引用
+     * @Date: 19.11.24
+     */
+    consensusState = cs
 	return cs
 }
+
+/*
+ * @Author: zyj
+ * @Desc: 静态方法获取句柄
+ * @Date: 19.11.24
+ */
+func GetConsensusState() (cs *ConsensusState) {
+    return consensusState
+}
+
 
 //----------------------------------------
 // Public interface
@@ -407,6 +430,13 @@ func (cs *ConsensusState) reconstructLastCommit(state sm.State) {
 	}
 	seenCommit := cs.blockStore.LoadSeenCommit(state.LastBlockHeight)
 	lastPrecommits := types.NewVoteSet(state.ChainID, state.LastBlockHeight, seenCommit.Round(), types.VoteTypePrecommit, state.LastValidators)
+	/*
+	    zyj change
+	 */
+	if seenCommit == nil {
+	    cs.LastCommit = lastPrecommits
+        return
+    }
 	for _, precommit := range seenCommit.Precommits {
 		if precommit == nil {
 			continue

@@ -276,10 +276,20 @@ func (commit *Commit) Height() int64 {
 
 // Round returns the round of the commit
 func (commit *Commit) Round() int {
+    if commit == nil {
+        return 0
+    }
 	if len(commit.Precommits) == 0 {
 		return 0
 	}
-	return commit.FirstPrecommit().Round
+	/*
+		zyj change
+	 */
+	 if commit.FirstPrecommit() != nil {
+		 return commit.FirstPrecommit().Round
+	 } else {
+	 	return 0
+	 }
 }
 
 // Type returns the vote type of the commit, which is always VoteTypePrecommit

@@ -128,7 +128,6 @@ func _getState(key []byte) []byte {
 func _setState(key []byte, val []byte) {
     //blockExec.db.SetSync(key, val);
     db.Set(key, val)
-    db.Iterator()
 }
 
 // 解析交易

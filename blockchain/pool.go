@@ -87,7 +87,8 @@ func NewBlockPool(start int64, requestsCh chan<- BlockRequest, timeoutsCh chan<-
 }
 
 func (pool *BlockPool) OnStart() error {
-	go pool.makeRequestersRoutine()
+    go pool.makeRequestersRoutine()
+
 	pool.startTime = time.Now()
 	return nil
 }
@@ -96,13 +97,37 @@ func (pool *BlockPool) OnStop() {}
 
 // Run spawns requesters as needed.
 func (pool *BlockPool) makeRequestersRoutine() {
+    /*
+     * @Author: zyj
+     * @Desc: pool启动时即同步快照和当前版本，height=-1
+     * @Date: 19.11.24
+     */
+    pool.Logger.Error("节点请求同步快照")
+    for ; ; {
+        if len(pool.peers) > 0 {
+            break
+        }
+        time.Sleep(100 * time.Microsecond)
+    }
+    for _, peer := range pool.peers {
+        pool.Logger.Error("发送消息给邻居节点", peer.id)
+        pool.requestsCh <- BlockRequest{-1, peer.id}
+        break
+    }
+    time.Sleep(time.Second * 5)
+    pool.Logger.Error("节点开始同步区块")
+    pool.Logger.Error(cmn.Fmt("当前高度为: %v", pool.height))
+    // ------------------------------------------------------
+
 	for {
+        //pool.Logger.Error(cmn.Fmt("pool开启: %v", pool.IsRunning()))
 		if !pool.IsRunning() {
 			break
 		}
 
 		_, numPending, lenRequesters := pool.GetStatus()
-		if numPending >= maxPendingRequests {
+        //pool.Logger.Error(cmn.Fmt("numpending： %v, lenReq: %v: ", numPending, lenRequesters))
+        if numPending >= maxPendingRequests {
 			// sleep for a bit.
 			time.Sleep(requestIntervalMS * time.Millisecond)
 			// check for timed out peers
@@ -115,6 +140,7 @@ func (pool *BlockPool) makeRequestersRoutine() {
 		} else {
 			// request for more blocks.
 			pool.makeNextRequester()
+            //pool.Logger.Error("下一个请求")
 		}
 	}
 }
@@ -317,7 +343,8 @@ func (pool *BlockPool) makeNextRequester() {
 
 	nextHeight := pool.height + pool.requestersLen()
 	request := newBPRequester(pool, nextHeight)
-	// request.SetLogger(pool.Logger.With("height", nextHeight))
+	//request.SetLogger(pool.Logger.With("height", nextHeight))
+	//pool.Logger.Error(cmn.Fmt("下一个区块高度: %v", nextHeight))
 
 	pool.requesters[nextHeight] = request
 	pool.numPending++
@@ -325,7 +352,10 @@ func (pool *BlockPool) makeNextRequester() {
 	err := request.Start()
 	if err != nil {
 		request.Logger.Error("Error starting request", "err", err)
+
 	}
+    //pool.Logger.Error(cmn.Fmt("下一个区块高度: %v", nextHeight))
+
 }
 
 func (pool *BlockPool) requestersLen() int64 {
@@ -464,6 +494,7 @@ func newBPRequester(pool *BlockPool, height int64) *bpRequester {
 }
 
 func (bpr *bpRequester) OnStart() error {
+    bpr.Logger.Error("bprRequest开启")
 	go bpr.requestRoutine()
 	return nil
 }
@@ -531,8 +562,10 @@ OUTER_LOOP:
 		bpr.peerID = peer.id
 		bpr.mtx.Unlock()
 
+        bpr.Logger.Error(cmn.Fmt("请求区块高度: %v, peerid: %v", bpr.height, peer.id))
 		// Send request and wait.
 		bpr.pool.sendRequest(bpr.height, peer.id)
+
 		select {
 		case <-bpr.pool.Quit():
 			bpr.Stop()

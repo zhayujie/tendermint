@@ -1,25 +1,24 @@
 package consensus
 
 import (
-	"bytes"
-	"fmt"
-	"hash/crc32"
-	"io"
-	"reflect"
-	//"strconv"
-	//"strings"
-	"time"
+    "bytes"
+    "fmt"
+    "hash/crc32"
+    "io"
+    "reflect"
+    //"strconv"
+    //"strings"
+    "time"
 
-	abci "github.com/tendermint/abci/types"
-	//auto "github.com/tendermint/tmlibs/autofile"
-	cmn "github.com/tendermint/tmlibs/common"
-	dbm "github.com/tendermint/tmlibs/db"
-	"github.com/tendermint/tmlibs/log"
+    abci "github.com/tendermint/abci/types"
 
-	"github.com/tendermint/tendermint/proxy"
-	sm "github.com/tendermint/tendermint/state"
-	"github.com/tendermint/tendermint/types"
-	"github.com/tendermint/tendermint/version"
+    dbm "github.com/tendermint/tmlibs/db"
+    "github.com/tendermint/tmlibs/log"
+
+    "github.com/tendermint/tendermint/proxy"
+    sm "github.com/tendermint/tendermint/state"
+    "github.com/tendermint/tendermint/types"
+    "github.com/tendermint/tendermint/version"
 )
 
 var crc32c = crc32.MakeTable(crc32.Castagnoli)
@@ -261,17 +260,22 @@ func (h *Handshaker) ReplayBlocks(state sm.State, appHash []byte, appBlockHeight
 		return appHash, checkAppHash(state, appHash)
 
 	} else if storeBlockHeight < appBlockHeight {
-		// the app should never be ahead of the store (but this is under app's control)
-		return appHash, sm.ErrAppBlockHeightTooHigh{storeBlockHeight, appBlockHeight}
-
-	} else if storeBlockHeight < stateBlockHeight {
-		// the state should never be ahead of the store (this is under tendermint's control)
-		cmn.PanicSanity(cmn.Fmt("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
-
-	} else if storeBlockHeight > stateBlockHeight+1 {
-		// store should be at most one ahead of the state (this is under tendermint's control)
-		cmn.PanicSanity(cmn.Fmt("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
-	}
+        // the app should never be ahead of the store (but this is under app's control)
+        return appHash, sm.ErrAppBlockHeightTooHigh{storeBlockHeight, appBlockHeight}
+    }
+    /*
+     * @Author: zyj
+     * @Desc: 移除区块校验
+     * @Date: 19.11.24
+     */
+	//} else if storeBlockHeight < stateBlockHeight {
+	//	// the state should never be ahead of the store (this is under tendermint's control)
+	//	cmn.PanicSanity(cmn.Fmt("StateBlockHeight (%d) > StoreBlockHeight (%d)", stateBlockHeight, storeBlockHeight))
+    //
+	//} else if storeBlockHeight > stateBlockHeight+1 {
+	//	// store should be at most one ahead of the state (this is under tendermint's control)
+	//	cmn.PanicSanity(cmn.Fmt("StoreBlockHeight (%d) > StateBlockHeight + 1 (%d)", storeBlockHeight, stateBlockHeight+1))
+	//}
 
 	var err error
 	// Now either store is equal to state, or one ahead.
@@ -319,8 +323,16 @@ func (h *Handshaker) ReplayBlocks(state sm.State, appHash []byte, appBlockHeight
 
 	}
 
-	cmn.PanicSanity("Should never happen")
-	return nil, nil
+    /*
+    * @Author: zyj
+    * @Desc: 移除区块校验报错
+    * @Date: 19.11.24
+    */
+
+	// cmn.PanicSanity("Should never happen")
+	//return nil, nil
+
+	return appHash, nil
 }
 
 func (h *Handshaker) replayBlocks(state sm.State, proxyApp proxy.AppConns, appBlockHeight, storeBlockHeight int64, mutateState bool) ([]byte, error) {
