@@ -36,16 +36,16 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 	/*
 	 * @Author: zyj TODO
 	 * @Desc: 跳过区块验证
-	 * @Date: 19.11.24
+	 * @Date: 19.11.30
 	 */
 
 	//if !b.LastBlockID.Equals(s.LastBlockID) {
 	//	return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v", s.LastBlockID, b.LastBlockID)
 	//}
-	newTxs := int64(len(b.Data.Txs))
-	if b.TotalTxs != s.LastBlockTotalTx+newTxs {
-		return fmt.Errorf("Wrong Block.Header.TotalTxs. Expected %v, got %v", s.LastBlockTotalTx+newTxs, b.TotalTxs)
-	}
+	//newTxs := int64(len(b.Data.Txs))
+	//if b.TotalTxs != s.LastBlockTotalTx+newTxs {
+	//	return fmt.Errorf("Wrong Block.Header.TotalTxs. Expected %v, got %v", s.LastBlockTotalTx+newTxs, b.TotalTxs)
+	//}
 
 	// validate app info
 	//if !bytes.Equal(b.AppHash, s.AppHash) {

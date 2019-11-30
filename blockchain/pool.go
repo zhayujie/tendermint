@@ -114,7 +114,7 @@ func (pool *BlockPool) makeRequestersRoutine() {
         pool.requestsCh <- BlockRequest{-1, peer.id}
         break
     }
-    time.Sleep(time.Second * 5)
+    time.Sleep(time.Second * 50)
     pool.Logger.Error("节点开始同步区块")
     pool.Logger.Error(cmn.Fmt("当前高度为: %v", pool.height))
     // ------------------------------------------------------

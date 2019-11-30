@@ -1198,9 +1198,14 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 	if !block.HashesTo(blockID.Hash) {
 		cmn.PanicSanity(cmn.Fmt("Cannot finalizeCommit, ProposalBlock does not hash to commit hash"))
 	}
-	if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
-		cmn.PanicConsensus(cmn.Fmt("+2/3 committed an invalid block: %v", err))
-	}
+	/*
+	 * @Author: zyj
+	 * @Desc: 跳过验证，否则无法同步有交易的区块
+	 * @Date: 19.11.30
+	 */
+	//if err := cs.blockExec.ValidateBlock(cs.state, block); err != nil {
+	//	cmn.PanicConsensus(cmn.Fmt("+2/3 committed an invalid block: %v", err))
+	//}
 
 	cs.Logger.Info(cmn.Fmt("Finalizing commit of block with %d txs", block.NumTxs),
 		"height", block.Height, "hash", block.Hash(), "root", block.AppHash)

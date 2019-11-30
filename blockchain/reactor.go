@@ -1,21 +1,22 @@
 package blockchain
 
 import (
-    "bytes"
-    "errors"
-    "fmt"
-    "reflect"
-    "sync"
-    "time"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"reflect"
+	"sync"
+	"time"
 
-    "github.com/tendermint/go-wire"
+	"github.com/tendermint/go-wire"
 
-    cmn "github.com/tendermint/tmlibs/common"
-    "github.com/tendermint/tmlibs/log"
+	cmn "github.com/tendermint/tmlibs/common"
+	"github.com/tendermint/tmlibs/log"
 
-    "github.com/tendermint/tendermint/p2p"
-    sm "github.com/tendermint/tendermint/state"
-    "github.com/tendermint/tendermint/types"
+	"github.com/tendermint/tendermint/p2p"
+	sm "github.com/tendermint/tendermint/state"
+	"github.com/tendermint/tendermint/types"
 )
 
 const (
@@ -193,12 +194,14 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 	/*
      * @Author: zyj
      * @Desc: 增加快照请求和响应的逻辑处理
-     * @Date: 19.11.24
+     * @Date: 19.11.30
      */
     case *bcSnapshotRequestMessage:
         bcR.Logger.Error("收到快照请求! 现在发送快照")
+    	// 获取所有状态集合
+    	snapShopMap, _ := json.Marshal(sm.GetAllStates())
         src.TrySend(BlockchainChannel,
-            struct{ BlockchainMessage }{&bcSnapshotResponseMessage{bcR.store.Height(), []byte("snapshot")}})
+            struct{ BlockchainMessage }{&bcSnapshotResponseMessage{bcR.store.Height(), snapShopMap}})
 
     case *bcSnapshotResponseMessage:
         bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
@@ -265,7 +268,7 @@ FOR_LOOP:
              * @Date: 19.11.24
              */
             if request.Height == -1 {
-                bcR.Logger.Error(cmn.Fmt("收到同步快照请求from: %v", request.PeerID))
+                bcR.Logger.Error(cmn.Fmt("现在发送同步快照请求: %v", request.PeerID))
                 msg := &bcSnapshotRequestMessage{}
                 peer.TrySend(BlockchainChannel, struct{ BlockchainMessage}{msg})
                 continue FOR_LOOP
@@ -301,6 +304,8 @@ FOR_LOOP:
                  * @Date: 19.11.24
                  */
                 state.LastBlockHeight = height - 1
+                // ------------------------------------
+
 				bcR.pool.Stop()
 				conR := bcR.Switch.Reactor("CONSENSUS").(consensusReactor)
 				conR.SwitchToConsensus(state, blocksSynced)

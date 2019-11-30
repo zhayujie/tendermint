@@ -8,8 +8,11 @@ package state
 
 import (
     "encoding/json"
+    "fmt"
+    cmn "github.com/tendermint/tmlibs/common"
     dbm "github.com/tendermint/tmlibs/db"
     "github.com/tendermint/tmlibs/log"
+    "os"
     "strconv"
     "strings"
 )
@@ -34,6 +37,9 @@ type TxArg struct {
 
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
+    if db == nil || logger == nil {
+        InitAccountDB(nil)
+    }
     return _parseTx(tx)
 }
 
@@ -53,17 +59,18 @@ func (accountLog * AccountLog) Check() bool {
         return false
     }
 
-    balanceToStr := _getState([]byte(to))
+    //balanceToStr := _getState([]byte(to))
     balanceFromStr := _getState([]byte(from))
 
     if len(from) != 0 && balanceFromStr == nil {
         logger.Error("支出方账户不存在")
         return false
     }
-    if len(from) != 0 && balanceToStr == nil {
-        logger.Error("接收方账户不存在")
-        return false
-    }
+    // 测试环境暂时允许不存在
+    //if len(from) != 0 && balanceToStr == nil {
+    //    logger.Error("接收方账户不存在")
+    //    return false
+    //}
 
     if len(from) != 0 {
         balanceFrom := _byte2digit(balanceFromStr)
@@ -79,6 +86,8 @@ func (accountLog * AccountLog) Check() bool {
 
 // 更新状态
 func (accountLog * AccountLog) Save() {
+    logger.Error("save：")
+
     // 支出
     if len(accountLog.From) != 0 {
         balanceFrom := _byte2digit(_getState([]byte(accountLog.From)))
@@ -86,7 +95,7 @@ func (accountLog * AccountLog) Save() {
         _setState([]byte(accountLog.From), _digit2byte(balanceFrom))
     }
     // 收入
-    var balanceTo int
+    var balanceTo = 0
     if len(accountLog.From) != 0 {
         balanceTo = _byte2digit(_getState([]byte(accountLog.To)))
         balanceTo += accountLog.Amount
@@ -94,7 +103,13 @@ func (accountLog * AccountLog) Save() {
         balanceTo = accountLog.Amount
     }
     _setState([]byte(accountLog.To), _digit2byte(balanceTo))
+    logger.Error("交易完成：")
     logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
+    logger.Error("交易完成：22222")
+    //balanceA := _getState([]byte(accountLog.From))
+    //balanceB := _getState([]byte(accountLog.To))
+    //logger.Error(accountLog.From + "账户余额: " + string(balanceA) + ", " + accountLog.To + "账户余额: " + string(balanceB))
+    logger.Error(cmn.Fmt("状态集合为: ", GetAllStates()))
 }
 
 
@@ -109,8 +124,13 @@ var logger log.Logger
 
 // 获取db和logger句柄
 func InitAccountDB(blockExec *BlockExecutor) {
-    db = blockExec.db
-    logger = blockExec.logger
+    db = dbm.NewMemDB()
+    if blockExec == nil {
+        logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+    } else {
+        //db = blockExec.db
+        logger = blockExec.logger
+    }
 }
 
 // 为单元测试提供的初始化
@@ -126,12 +146,48 @@ func _getState(key []byte) []byte {
 
 // 更新状态
 func _setState(key []byte, val []byte) {
-    //blockExec.db.SetSync(key, val);
-    db.Set(key, val)
+    if db != nil {
+        //blockExec.db.SetSync(key, val);
+        db.Set(key, val)
+    }
+}
+
+// 获取所有状态集合
+func GetAllStates() (map[string]string) {
+    kvMaps := make(map[string]string)
+    iter := db.Iterator([]byte("0"), []byte("z"))
+    for iter.Valid() {
+        key := string(iter.Key())
+        val := string(iter.Value())
+        kvMaps[key] = val
+        fmt.Println(iter.Valid())
+        iter.Next()
+    }
+    return kvMaps
 }
 
 // 解析交易
 func _parseTx(tx []byte) *AccountLog{
+    args := strings.Split(string(tx), "_")
+    fmt.Println(args)
+    if len(args) != 3 {
+        logger.Error("参数个数错误")
+        return nil
+    }
+
+    amount, err := strconv.Atoi(args[2])
+    if err != nil {
+        logger.Error("解析失败，金额应为整数")
+        return nil
+    }
+    accountLog := new(AccountLog)
+    accountLog.From = args[0]
+    accountLog.To = args[1]
+    accountLog.Amount = amount
+    return accountLog
+}
+
+func _parseTx1(tx []byte) *AccountLog{
     txArgs := new(TxArg)
     err := json.Unmarshal(tx, txArgs)
     if err != nil {

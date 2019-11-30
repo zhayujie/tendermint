@@ -78,6 +78,37 @@ func TestAccountLog_Save2(t *testing.T) {
 }
 
 
+func TestAccountLog_Save3(t *testing.T) {
+    db := dbm.NewMemDB()
+    InitDBForTest(db, log.TestingLogger())
+    txStr1 := "_a_100"
+    accountLog1 := NewAccountLog([]byte(txStr1))
+    txStr2 := "_b_500"
+    accountLog2 := NewAccountLog([]byte(txStr2))
+    accountLog1.Save()
+    accountLog2.Save()
+    fmt.Println("转账前: a的余额为: " + getState("a", db) + "  b的余额为: " + getState("b", db))
+
+    // 转账
+    txStr3 := "b_a_200"
+    accountLog3 := NewAccountLog([]byte(txStr3))
+    res := accountLog3.Check()
+    if !res {
+        t.Error("校验不通过")
+    }
+    accountLog3.Save()
+    fmt.Println("转账后: a的余额为: " + getState("a", db) + "  b的余额为: " + getState("b", db))
+
+    txStr4 := "a_e_200"
+    accountLog4 := NewAccountLog([]byte(txStr4))
+    accountLog4.Save()
+
+
+    testMap := GetAllStates()
+    fmt.Println(testMap)
+}
+
+
 
 
 
