@@ -203,9 +203,21 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
         src.TrySend(BlockchainChannel,
             struct{ BlockchainMessage }{&bcSnapshotResponseMessage{bcR.store.Height(), snapShopMap}})
 
+
     case *bcSnapshotResponseMessage:
-        bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
-        // 更新当前区块高度为快照版本
+		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
+
+		// 处理快照
+		myMap := make(map[string]string)
+    	json.Unmarshal(msg.Content, &myMap)
+		count := 0
+		for k, v := range myMap {
+			sm.SetState([]byte(k), []byte(v))
+			count++
+		}
+		bcR.Logger.Error(cmn.Fmt("快照写入完成, 长度为%v", count))
+
+		// 更新当前区块高度为快照版本
         if msg.Version > 0 && msg.Version < 0x7fffffff {
             bcR.store.height = msg.Version
             // 更新pool中的高度为当前高度+1

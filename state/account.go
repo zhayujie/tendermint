@@ -7,14 +7,17 @@
 package state
 
 import (
+    "crypto/md5"
     "encoding/json"
     "fmt"
     cmn "github.com/tendermint/tmlibs/common"
     dbm "github.com/tendermint/tmlibs/db"
     "github.com/tendermint/tmlibs/log"
+    "math/rand"
     "os"
     "strconv"
     "strings"
+    "time"
 )
 
 
@@ -92,7 +95,7 @@ func (accountLog * AccountLog) Save() {
     if len(accountLog.From) != 0 {
         balanceFrom := _byte2digit(_getState([]byte(accountLog.From)))
         balanceFrom -= accountLog.Amount
-        _setState([]byte(accountLog.From), _digit2byte(balanceFrom))
+        SetState([]byte(accountLog.From), _digit2byte(balanceFrom))
     }
     // 收入
     var balanceTo = 0
@@ -102,7 +105,7 @@ func (accountLog * AccountLog) Save() {
     } else {
         balanceTo = accountLog.Amount
     }
-    _setState([]byte(accountLog.To), _digit2byte(balanceTo))
+    SetState([]byte(accountLog.To), _digit2byte(balanceTo))
     logger.Error("交易完成：")
     logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
     logger.Error("交易完成：22222")
@@ -124,11 +127,12 @@ var logger log.Logger
 
 // 获取db和logger句柄
 func InitAccountDB(blockExec *BlockExecutor) {
-    db = dbm.NewMemDB()
+    //db = dbm.NewMemDB()
     if blockExec == nil {
         logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
+        //db = dbm.NewMemDB()
     } else {
-        //db = blockExec.db
+        db = blockExec.db
         logger = blockExec.logger
     }
 }
@@ -145,7 +149,7 @@ func _getState(key []byte) []byte {
 }
 
 // 更新状态
-func _setState(key []byte, val []byte) {
+func SetState(key []byte, val []byte) {
     if db != nil {
         //blockExec.db.SetSync(key, val);
         db.Set(key, val)
@@ -154,16 +158,38 @@ func _setState(key []byte, val []byte) {
 
 // 获取所有状态集合
 func GetAllStates() (map[string]string) {
+    n := 10000
     kvMaps := make(map[string]string)
-    iter := db.Iterator([]byte("0"), []byte("z"))
-    for iter.Valid() {
-        key := string(iter.Key())
-        val := string(iter.Value())
-        kvMaps[key] = val
-        fmt.Println(iter.Valid())
-        iter.Next()
+    //iter := db.Iterator([]byte("0"), []byte("z"))
+    //for iter.Valid() {
+    //    key := string(iter.Key())
+    //    val := string(iter.Value())
+    //    kvMaps[key] = val
+    //    fmt.Println(iter.Valid())
+    //    iter.Next()
+    //}
+    // 测试使用，作为快照集合
+    for i := 0; i < n; i++ {
+        address := _geneate_random_str(32)
+        t := md5.Sum([]byte(address))
+        md5str := fmt.Sprintf("%x", t)
+        //amout := rand.Intn(100)
+        kvMaps[address] = md5str
+        SetState([]byte(md5str), []byte(md5str))
     }
     return kvMaps
+}
+
+
+func _geneate_random_str(l int) string {
+    str := "0123456789abcdefghijklmnopqrstuvwxyz"
+    bytes := []byte(str)
+    result := []byte{}
+    r := rand.New(rand.NewSource(time.Now().UnixNano()))
+    for i := 0; i < l; i++ {
+        result = append(result, bytes[r.Intn(len(bytes))])
+    }
+    return string(result)
 }
 
 // 解析交易

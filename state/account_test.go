@@ -9,7 +9,7 @@ import (
 
 func TestNewAccountLog(t *testing.T) {
     InitDBForTest(dbm.NewMemDB(), log.TestingLogger())
-
+    fmt.Println(_geneate_random_str(32))
     txStr := "{\"TxType\":\"tx\", \"Sender\":\"a\", \"Receiver\":\"b\", \"Content\":\"100\"}"
     tx := []byte(txStr)
     accountLog := NewAccountLog(tx)
