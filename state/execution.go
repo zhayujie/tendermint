@@ -2,14 +2,14 @@ package state
 
 import (
 	"fmt"
-
-	fail "github.com/ebuchman/fail-test"
+	"github.com/ebuchman/fail-test"
 	abci "github.com/tendermint/abci/types"
-	crypto "github.com/tendermint/go-crypto"
+	"github.com/tendermint/go-crypto"
 	"github.com/tendermint/tendermint/proxy"
 	"github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tmlibs/db"
 	"github.com/tendermint/tmlibs/log"
+	"time"
 )
 
 //-----------------------------------------------------------------------------
@@ -86,10 +86,21 @@ func (blockExec *BlockExecutor) ValidateBlock(s State, block *types.Block) error
 // It takes a blockID to avoid recomputing the parts hash.
 func (blockExec *BlockExecutor) ApplyBlock(s State, blockID types.BlockID, block *types.Block) (State, error) {
 
+	/*
+	 * @Author: zyj
+	 * @Desc: 周期性生成快照
+	 * @Date: 19.12.07
+	 */
+	currentHeight := block.Height - 1
+	if currentHeight > 0 && int(currentHeight) % SNAPSHOT_INTERVAL == 0 {
+		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
+		time.Sleep(time.Second * 5)
+		GenerateSnapshot(block.Height - 1)
+	}
+
 	if err := blockExec.ValidateBlock(s, block); err != nil {
 		return s, ErrInvalidBlock(err)
 	}
-
 	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block)
 	if err != nil {
 		return s, ErrProxyAppConn(err)

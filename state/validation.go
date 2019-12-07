@@ -16,14 +16,18 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 	if err := b.ValidateBasic(); err != nil {
 		return err
 	}
-
+	/*
+	 * @Author: zyj
+	 * @Desc: 跳过区块验证
+	 * @Date: 19.12.07
+	 */
 	// validate basic info
 	if b.ChainID != s.ChainID {
 		return fmt.Errorf("Wrong Block.Header.ChainID. Expected %v, got %v", s.ChainID, b.ChainID)
 	}
-	if b.Height != s.LastBlockHeight+1 {
-		return fmt.Errorf("Wrong Block.Header.Height. Expected %v, got %v", s.LastBlockHeight+1, b.Height)
-	}
+	//if b.Height != s.LastBlockHeight+1 {
+	//	return fmt.Errorf("Wrong Block.Header.Height. Expected %v, got %v", s.LastBlockHeight+1, b.Height)
+	//}
 	/*	TODO: Determine bounds for Time
 		See blockchain/reactor "stopSyncingDurationMinutes"
 
@@ -33,11 +37,6 @@ func validateBlock(stateDB dbm.DB, s State, b *types.Block) error {
 	*/
 
 	// validate prev block info
-	/*
-	 * @Author: zyj TODO
-	 * @Desc: 跳过区块验证
-	 * @Date: 19.11.30
-	 */
 
 	//if !b.LastBlockID.Equals(s.LastBlockID) {
 	//	return fmt.Errorf("Wrong Block.Header.LastBlockID.  Expected %v, got %v", s.LastBlockID, b.LastBlockID)

@@ -46,6 +46,11 @@ func NewAccountLog(tx []byte) *AccountLog {
     return _parseTx(tx)
 }
 
+// 快照数据结构
+type Snapshot struct {
+    Version     int64                   // 版本
+    Content     map[string]string       // 内容
+}
 
 
 /*
@@ -124,6 +129,9 @@ func (accountLog * AccountLog) Save() {
 // 全局对象
 var db dbm.DB
 var logger log.Logger
+var snapshot Snapshot
+var SNAPSHOT_INTERVAL = 10
+
 
 // 获取db和logger句柄
 func InitAccountDB(blockExec *BlockExecutor) {
@@ -170,7 +178,7 @@ func GetAllStates() (map[string]string) {
     //}
     // 测试使用，作为快照集合
     for i := 0; i < n; i++ {
-        address := _geneate_random_str(32)
+        address := _geneateRandomStr(32)
         t := md5.Sum([]byte(address))
         md5str := fmt.Sprintf("%x", t)
         //amout := rand.Intn(100)
@@ -180,8 +188,21 @@ func GetAllStates() (map[string]string) {
     return kvMaps
 }
 
+// 生成快照
+func GenerateSnapshot(version int64) {
+    newSnapshot := Snapshot{}
+    newSnapshot.Version = version
+    // 快照内容，仅供测试
+    newSnapshot.Content = GetAllStates()
+    snapshot = newSnapshot
+}
 
-func _geneate_random_str(l int) string {
+// 获取快照
+func GetSnapshot() Snapshot {
+    return snapshot
+}
+
+func _geneateRandomStr(l int) string {
     str := "0123456789abcdefghijklmnopqrstuvwxyz"
     bytes := []byte(str)
     result := []byte{}
