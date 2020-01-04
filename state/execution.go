@@ -89,13 +89,15 @@ func (blockExec *BlockExecutor) ApplyBlock(s State, blockID types.BlockID, block
 	/*
 	 * @Author: zyj
 	 * @Desc: 周期性生成快照
-	 * @Date: 19.12.07
+	 * @Date: 19.01.04
 	 */
 	currentHeight := block.Height - 1
 	if currentHeight > 0 && int(currentHeight) % SNAPSHOT_INTERVAL == 0 {
 		blockExec.logger.Error("生成快照", "当前链高度", currentHeight)
 		time.Sleep(time.Second * 5)
-		GenerateSnapshot(block.Height - 1)
+
+		// 快照生成v2.0
+		GenerateSnapshotFast(block.Height - 1)
 	}
 
 	if err := blockExec.ValidateBlock(s, block); err != nil {

@@ -2,14 +2,14 @@ package state
 
 import (
     "fmt"
-    "testing"
-    "github.com/tendermint/tmlibs/log"
     dbm "github.com/tendermint/tmlibs/db"
+    "github.com/tendermint/tmlibs/log"
+    "testing"
 )
 
 func TestNewAccountLog(t *testing.T) {
     InitDBForTest(dbm.NewMemDB(), log.TestingLogger())
-    fmt.Println(_geneate_random_str(32))
+    //fmt.Println(_geneate_random_str(32))
     txStr := "{\"TxType\":\"tx\", \"Sender\":\"a\", \"Receiver\":\"b\", \"Content\":\"100\"}"
     tx := []byte(txStr)
     accountLog := NewAccountLog(tx)
@@ -23,7 +23,7 @@ func TestNewAccountLog(t *testing.T) {
 func TestAccountLog_Check(t *testing.T) {
     db := dbm.NewMemDB()
     InitDBForTest(db, log.TestingLogger())
-    txStr := "{\"TxType\":\"tx\", \"Sender\":\"\", \"Receiver\":\"b\", \"Content\":\"100\"}"
+    txStr := "_b_100"
     accountLog := NewAccountLog([]byte(txStr))
     res := accountLog.Check()
     fmt.Println(res)
@@ -41,15 +41,15 @@ func TestAccountLog_Save(t *testing.T) {
 func TestAccountLog_Check2(t *testing.T) {
     db := dbm.NewMemDB()
     InitDBForTest(db, log.TestingLogger())
-    txStr1 := "{\"TxType\":\"tx\", \"Sender\":\"\", \"Receiver\":\"b\", \"Content\":\"100\"}"
+    txStr1 := "_B_100"
     accountLog1 := NewAccountLog([]byte(txStr1))
-    txStr2 := "{\"TxType\":\"tx\", \"Sender\":\"\", \"Receiver\":\"a\", \"Content\":\"500\"}"
+    txStr2 := "_A_500"
     accountLog2 := NewAccountLog([]byte(txStr2))
     accountLog1.Save()
     accountLog2.Save()
 
     // 转账
-    txStr3 := "{\"TxType\":\"tx\", \"Sender\":\"b\", \"Receiver\":\"a\", \"Content\":\"200\"}"
+    txStr3 := "A_B_200"
     accountLog3 := NewAccountLog([]byte(txStr3))
     accountLog3.Check()
 }
@@ -109,8 +109,22 @@ func TestAccountLog_Save3(t *testing.T) {
 }
 
 
+func TestGenerateSnapshotFast(t *testing.T) {
+    db := dbm.NewMemDB()
+    InitDBForTest(db, log.TestingLogger())
+    txStr1 := "_a_100"
+    accountLog1 := NewAccountLog([]byte(txStr1))
+    txStr2 := "_b_500"
+    accountLog2 := NewAccountLog([]byte(txStr2))
+    accountLog1.Save()
+    accountLog2.Save()
+    GenerateSnapshotFast(1)
 
-
+    txStr3 := "b_a_200"
+    accountLog3 := NewAccountLog([]byte(txStr3))
+    accountLog3.Save()
+    GenerateSnapshotFast(2)
+}
 
 
 func getState(account string, db dbm.DB) string {

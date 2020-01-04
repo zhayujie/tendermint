@@ -7,7 +7,6 @@
 package state
 
 import (
-    "crypto/md5"
     "encoding/json"
     "fmt"
     cmn "github.com/tendermint/tmlibs/common"
@@ -94,8 +93,6 @@ func (accountLog * AccountLog) Check() bool {
 
 // 更新状态
 func (accountLog * AccountLog) Save() {
-    logger.Error("save：")
-
     // 支出
     if len(accountLog.From) != 0 {
         balanceFrom := _byte2digit(_getState([]byte(accountLog.From)))
@@ -113,11 +110,18 @@ func (accountLog * AccountLog) Save() {
     SetState([]byte(accountLog.To), _digit2byte(balanceTo))
     logger.Error("交易完成：")
     logger.Error("交易完成：" +  accountLog.From + " -> " + accountLog.To + "  " + strconv.Itoa(accountLog.Amount))
-    logger.Error("交易完成：22222")
     //balanceA := _getState([]byte(accountLog.From))
     //balanceB := _getState([]byte(accountLog.To))
     //logger.Error(accountLog.From + "账户余额: " + string(balanceA) + ", " + accountLog.To + "账户余额: " + string(balanceB))
-    logger.Error(cmn.Fmt("状态集合为: ", GetAllStates()))
+    statesByte, _ := json.Marshal(GetAllStates())
+    logger.Error(cmn.Fmt("状态集合为: %v", string(statesByte)))
+
+    // 快照增量缓存
+    SetSnapshotCache(accountLog.From, accountLog.Amount, false)
+    SetSnapshotCache(accountLog.To, accountLog.Amount, true)
+
+    cacheByte, _ := json.Marshal(snapshotCache)
+    logger.Error(cmn.Fmt("快照缓存集合为: %v", string(cacheByte)))
 }
 
 
@@ -125,22 +129,25 @@ func (accountLog * AccountLog) Save() {
 /*
  * 静态函数和私有函数
  */
-
 // 全局对象
 var db dbm.DB
 var logger log.Logger
+// 最新快照
 var snapshot Snapshot
+// 快照缓存
+var snapshotCache = make(map[string]int)
+
 var SNAPSHOT_INTERVAL = 10
 
 
 // 获取db和logger句柄
 func InitAccountDB(blockExec *BlockExecutor) {
-    //db = dbm.NewMemDB()
+    db = dbm.NewMemDB()
     if blockExec == nil {
         logger = log.NewTMLogger(log.NewSyncWriter(os.Stdout))
-        //db = dbm.NewMemDB()
+        db = dbm.NewMemDB()
     } else {
-        db = blockExec.db
+        //db = blockExec.db
         logger = blockExec.logger
     }
 }
@@ -166,29 +173,29 @@ func SetState(key []byte, val []byte) {
 
 // 获取所有状态集合
 func GetAllStates() (map[string]string) {
-    n := 10000
+    //n := 10000
     kvMaps := make(map[string]string)
-    //iter := db.Iterator([]byte("0"), []byte("z"))
-    //for iter.Valid() {
-    //    key := string(iter.Key())
-    //    val := string(iter.Value())
-    //    kvMaps[key] = val
-    //    fmt.Println(iter.Valid())
-    //    iter.Next()
-    //}
-    // 测试使用，作为快照集合
-    for i := 0; i < n; i++ {
-        address := _geneateRandomStr(32)
-        t := md5.Sum([]byte(address))
-        md5str := fmt.Sprintf("%x", t)
-        //amout := rand.Intn(100)
-        kvMaps[address] = md5str
-        SetState([]byte(md5str), []byte(md5str))
+    iter := db.Iterator([]byte("0"), []byte("z"))
+    for iter.Valid() {
+       key := string(iter.Key())
+       val := string(iter.Value())
+       kvMaps[key] = val
+       //fmt.Println(iter.Valid())
+       iter.Next()
     }
+    // 测试使用，作为快照集合
+    //for i := 0; i < n; i++ {
+    //    address := _geneateRandomStr(32)
+    //    t := md5.Sum([]byte(address))
+    //    md5str := fmt.Sprintf("%x", t)
+    //    //amout := rand.Intn(100)
+    //    kvMaps[address] = md5str
+    //    SetState([]byte(md5str), []byte(md5str))
+    //}
     return kvMaps
 }
 
-// 生成快照
+// 生成快照 v1.0版本
 func GenerateSnapshot(version int64) {
     newSnapshot := Snapshot{}
     newSnapshot.Version = version
@@ -197,10 +204,56 @@ func GenerateSnapshot(version int64) {
     snapshot = newSnapshot
 }
 
+
+// 生成快照 v2.0版本
+func GenerateSnapshotFast(version int64) {
+    // 如果当前快照不存在，则初始化
+    if snapshot.Content == nil {
+        snapshot.Content = make(map[string]string)
+    }
+
+    tempSnapshotCache := snapshotCache
+    // 清空缓存
+    snapshotCache = make(map[string]int)
+    // 当前快照内容
+
+    // 增量合并快照
+    for k, v := range tempSnapshotCache {
+        oldVal, _ := strconv.Atoi(snapshot.Content[k])
+        snapshot.Content[k] = strconv.Itoa(oldVal + v)
+    }
+    snapshot.Version = version
+
+    snapshotByte, _ := json.Marshal(snapshot)
+    logger.Error(cmn.Fmt("快照生成: %v", string(snapshotByte)))
+}
+
+
+// 保存增量缓存
+func SetSnapshotCache(key string, amount int, incr bool) {
+    if key == "" {
+        return
+    }
+    // 当该key不存在时，oldVal = 0
+    oldVal := snapshotCache[key]
+    if incr {
+        snapshotCache[key] = oldVal + amount
+    } else {
+        snapshotCache[key] = oldVal - amount
+    }
+}
+
 // 获取快照
 func GetSnapshot() Snapshot {
     return snapshot
 }
+
+// 更新快照
+func SetSnapshot(newSnapshot Snapshot) {
+    snapshot = newSnapshot
+}
+
+
 
 func _geneateRandomStr(l int) string {
     str := "0123456789abcdefghijklmnopqrstuvwxyz"

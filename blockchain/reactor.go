@@ -205,8 +205,8 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
             struct{ BlockchainMessage }{&bcSnapshotResponseMessage{snapshot.Version, snapShopMap}})
     	
     case *bcSnapshotResponseMessage:
-		//bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
-		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v", msg.Version))
+		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
+		//bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v", msg.Version))
 
     	// 处理快照
 		myMap := make(map[string]string)
@@ -217,6 +217,8 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 			count++
 		}
 		bcR.Logger.Error(cmn.Fmt("快照写入完成, 长度为%v", count))
+		// 更新当前快照
+		sm.SetSnapshot(sm.Snapshot{msg.Version, myMap})
 
 		// 更新当前区块高度为快照版本
         if msg.Version > 0 && msg.Version < 0x7fffffff {
