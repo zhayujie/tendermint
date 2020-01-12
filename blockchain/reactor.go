@@ -203,16 +203,19 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
     	snapShopMap, _ := json.Marshal(snapshot.Content)
         src.TrySend(BlockchainChannel,
             struct{ BlockchainMessage }{&bcSnapshotResponseMessage{snapshot.Version, snapShopMap}})
+    	// TODO: 生成签名，对快照sha256后，私钥签名
     	
     case *bcSnapshotResponseMessage:
 		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
 		//bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v", msg.Version))
 
+		// TODO: 验签，使用发送方公钥进行验签。 text文本为快照内容sha256后
     	// 处理快照
 		myMap := make(map[string]string)
     	json.Unmarshal(msg.Content, &myMap)
 		count := 0
 		for k, v := range myMap {
+		    // 快照写入
 			sm.SetState([]byte(k), []byte(v))
 			count++
 		}

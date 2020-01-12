@@ -130,3 +130,17 @@ func TestGenerateSnapshotFast(t *testing.T) {
 func getState(account string, db dbm.DB) string {
     return string(db.Get([]byte(account)))
 }
+
+func TestDoHash(t *testing.T) {
+    fmt.Println(DoHash("hello"))
+}
+
+func TestSign(t *testing.T) {
+    r, s := Sign("12356", "./priv.pem")
+    fmt.Println(string(r), "\n", string(s))
+    fmt.Println("验签结果: ", Verify(r, s, "12356", "./pub.pem"))
+}
+
+func TestGenerateKey(t *testing.T) {
+    GenerateKey("./priv.pem", "./pub.pem")
+}

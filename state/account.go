@@ -7,11 +7,19 @@
 package state
 
 import (
+    "crypto/ecdsa"
+    "crypto/elliptic"
+    crand "crypto/rand"
+    "crypto/sha256"
+    "crypto/x509"
+    "encoding/hex"
     "encoding/json"
+    "encoding/pem"
     "fmt"
     cmn "github.com/tendermint/tmlibs/common"
     dbm "github.com/tendermint/tmlibs/db"
     "github.com/tendermint/tmlibs/log"
+    "math/big"
     "math/rand"
     "os"
     "strconv"
@@ -226,6 +234,8 @@ func GenerateSnapshotFast(version int64) {
 
     snapshotByte, _ := json.Marshal(snapshot)
     logger.Error(cmn.Fmt("快照生成: %v", string(snapshotByte)))
+
+    // TODO: 增加签名
 }
 
 
@@ -361,9 +371,6 @@ func _parseTx3(tx []byte) *AccountLog {
 }
 
 
-
-
-
 // 字节数组和数字转换
 func _byte2digit(digitByte []byte) int {
     digit, _ := strconv.Atoi(string(digitByte))
@@ -372,4 +379,129 @@ func _byte2digit(digitByte []byte) int {
 
 func _digit2byte(num int) []byte {
     return []byte(strconv.Itoa(num))
+}
+
+// Hash算法 sha256: 生成的16进制字符串长度为32，大小为256bit
+func DoHash(text string) string {
+    hash := sha256.New()
+    hash.Write([]byte(text))
+    res := hash.Sum(nil)
+    return hex.EncodeToString(res)
+}
+
+// 签名 ECDSA
+func Sign(text string, priKeyPath string) ([]byte, []byte) {
+    //1，打开私钥文件，读出内容
+    file, err := os.Open(priKeyPath)
+    if err != nil {
+        panic(err)
+    }
+    info, err := file.Stat()
+    buf := make([]byte, info.Size())
+    file.Read(buf)
+    //2,pem解密
+    block, _ := pem.Decode(buf)
+    //x509解密
+    privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+    if err != nil {
+        panic(err)
+    }
+    //数字签名
+    r, s, err := ecdsa.Sign(crand.Reader, privateKey, []byte(text))
+    if err != nil {
+        panic(err)
+    }
+    rText, err := r.MarshalText()
+    if err != nil {
+        panic(err)
+    }
+    sText, err := s.MarshalText()
+    if err != nil {
+        panic(err)
+    }
+    defer file.Close()
+    return rText, sText
+}
+
+// 验证签名
+func Verify(rText []byte, sText []byte, text string, pubKeyPath string) bool {
+    file, err := os.Open(pubKeyPath)
+    if err != nil {
+        panic(err)
+    }
+    info, err := file.Stat()
+    if err != nil {
+        panic(err)
+    }
+    buf := make([]byte, info.Size())
+    file.Read(buf)
+    //pem解码
+    block, _ := pem.Decode(buf)
+
+    //x509
+    publicStream, err := x509.ParsePKIXPublicKey(block.Bytes)
+    if err != nil {
+        panic(err)
+    }
+    //接口转换成公钥
+    publicKey := publicStream.(*ecdsa.PublicKey)
+    var r, s big.Int
+    r.UnmarshalText(rText)
+    s.UnmarshalText(sText)
+    //认证
+    res := ecdsa.Verify(publicKey, []byte(text), &r, &s)
+    defer file.Close()
+    return res
+}
+
+// 生成ECDSA密钥对
+func GenerateKey(priKeyPath string, pubKeyPath string) error{
+    //使用ecdsa生成密钥对
+    privateKey, err := ecdsa.GenerateKey(elliptic.P521(), crand.Reader)
+    if err != nil {
+        return err
+    }
+    //使用509
+    private, err := x509.MarshalECPrivateKey(privateKey) //此处
+    if err != nil {
+        return err
+    }
+    //pem
+    block := pem.Block{
+        Type:  "esdsa private key",
+        Bytes: private,
+    }
+    file, err := os.Create(priKeyPath)
+    if err != nil {
+        return err
+    }
+    err = pem.Encode(file, &block)
+    if err != nil {
+        return err
+    }
+    file.Close()
+
+    //处理公钥
+    public := privateKey.PublicKey
+
+    //x509序列化
+    publicKey, err := x509.MarshalPKIXPublicKey(&public)
+    if err != nil {
+        return err
+    }
+    //pem
+    public_block := pem.Block{
+        Type:  "ecdsa public key",
+        Bytes: publicKey,
+    }
+    file, err = os.Create(pubKeyPath)
+    if err != nil {
+        return err
+    }
+    //pem编码
+    err = pem.Encode(file, &public_block)
+    if err != nil {
+        return err
+    }
+    return nil
 }
