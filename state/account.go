@@ -47,6 +47,11 @@ type TxArg struct {
 
 // 实例化交易
 func NewAccountLog(tx []byte) *AccountLog {
+    txArg := TxArg{}
+    err := json.Unmarshal(tx, txArg)
+    if err != nil && tx != nil {
+        return nil
+    }
     if db == nil || logger == nil {
         InitAccountDB(nil)
     }
@@ -147,6 +152,10 @@ var snapshotCache = make(map[string]int)
 
 var SNAPSHOT_INTERVAL = 10
 
+var IsNewPeer = true
+
+var SnapshotHash string
+
 
 // 获取db和logger句柄
 func InitAccountDB(blockExec *BlockExecutor) {
@@ -236,6 +245,9 @@ func GenerateSnapshotFast(version int64) {
     logger.Error(cmn.Fmt("快照生成: %v", string(snapshotByte)))
 
     // TODO: 增加签名
+    hash := DoHash(string(snapshotByte))
+    logger.Info("快照hash:", "hash", hash)
+    SnapshotHash = hash
 }
 
 

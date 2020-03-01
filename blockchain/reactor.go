@@ -1,22 +1,23 @@
 package blockchain
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"reflect"
-	"sync"
-	"time"
+    "bytes"
+    "encoding/hex"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "reflect"
+    "sync"
+    "time"
 
-	"github.com/tendermint/go-wire"
+    "github.com/tendermint/go-wire"
 
-	cmn "github.com/tendermint/tmlibs/common"
-	"github.com/tendermint/tmlibs/log"
+    cmn "github.com/tendermint/tmlibs/common"
+    "github.com/tendermint/tmlibs/log"
 
-	"github.com/tendermint/tendermint/p2p"
-	sm "github.com/tendermint/tendermint/state"
-	"github.com/tendermint/tendermint/types"
+    "github.com/tendermint/tendermint/p2p"
+    sm "github.com/tendermint/tendermint/state"
+    "github.com/tendermint/tendermint/types"
 )
 
 const (
@@ -181,6 +182,29 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
 	case *bcBlockResponseMessage:
 		// Got a block.
 		bcR.pool.AddBlock(src.ID(), msg.Block, len(msgBytes))
+        //bcR.Logger.Error("blockResponse: ", "height", msg.Block.Height, "len", len(msg.Block.Txs))
+		if sm.IsNewPeer && int(msg.Block.Height) % sm.SNAPSHOT_INTERVAL == 1 {
+		    block := msg.Block
+            //bcR.Logger.Error("初始快照的下一个区块为", "tx:", json.Marshal(msg.Block.Txs))
+            if block != nil && block.Data != nil {
+                for i := 0; i < len(block.Data.Txs); i++ {
+                    data := block.Data.Txs[i]
+                    encodeStr := hex.EncodeToString(data)
+                    temptx, _ := hex.DecodeString(encodeStr)        //得到真实的tx记录
+                    bcR.Logger.Error("快照的下一个区块 ", "高度:", block.Height, "交易:", string(temptx))
+                    // TODO: 如果是快照交易，将自身快照的hash与交易中hash进行对比
+
+                    //var t account.TxArg
+                    //json.Unmarshal(temptx, &t)
+
+                }
+            }
+
+            // zhayujie
+            // TODO 将自身快照的hash与交易中hash进行对比
+            sm.IsNewPeer = false
+        }
+
 	case *bcStatusRequestMessage:
 		// Send peer our state.
 		queued := src.TrySend(BlockchainChannel,
@@ -204,6 +228,7 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
         src.TrySend(BlockchainChannel,
             struct{ BlockchainMessage }{&bcSnapshotResponseMessage{snapshot.Version, snapShopMap}})
     	// TODO: 生成签名，对快照sha256后，私钥签名
+
     	
     case *bcSnapshotResponseMessage:
 		bcR.Logger.Error(cmn.Fmt("收到快照版本为 %v, 内容为%v", msg.Version, string(msg.Content)))
@@ -233,6 +258,9 @@ func (bcR *BlockchainReactor) Receive(chID byte, src p2p.Peer, msgBytes []byte) 
             //cs := consensus.GetConsensusState()
             //cs.Height = bcR.store.height
         }
+
+		// 标记为新加入节点
+		sm.IsNewPeer = true
     /* ---------- zyj change --------- */
 
     default:

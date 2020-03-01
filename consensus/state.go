@@ -1,25 +1,26 @@
 package consensus
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"reflect"
-	"runtime/debug"
-	"sync"
-	"time"
+    "bytes"
+    "encoding/hex"
+    "errors"
+    "fmt"
+    "reflect"
+    "runtime/debug"
+    "sync"
+    "time"
 
-	fail "github.com/ebuchman/fail-test"
+    "github.com/ebuchman/fail-test"
 
-	wire "github.com/tendermint/go-wire"
-	cmn "github.com/tendermint/tmlibs/common"
-	"github.com/tendermint/tmlibs/log"
+    "github.com/tendermint/go-wire"
+    cmn "github.com/tendermint/tmlibs/common"
+    "github.com/tendermint/tmlibs/log"
 
-	cfg "github.com/tendermint/tendermint/config"
-	cstypes "github.com/tendermint/tendermint/consensus/types"
-	"github.com/tendermint/tendermint/p2p"
-	sm "github.com/tendermint/tendermint/state"
-	"github.com/tendermint/tendermint/types"
+    cfg "github.com/tendermint/tendermint/config"
+    cstypes "github.com/tendermint/tendermint/consensus/types"
+    "github.com/tendermint/tendermint/p2p"
+    sm "github.com/tendermint/tendermint/state"
+    "github.com/tendermint/tendermint/types"
 )
 
 //-----------------------------------------------------------------------------
@@ -1399,6 +1400,25 @@ func (cs *ConsensusState) addVote(vote *types.Vote, peerID p2p.ID) (added bool, 
 		return
 	}
 
+	/**
+	 * zhayujie
+	 * 共识阶段校验快照交易
+	 */
+	block := cs.ProposalBlock
+	if block != nil && block.Data != nil {
+        for i := 0; i < len(block.Data.Txs); i++ {
+            data := block.Data.Txs[i]
+            encodeStr := hex.EncodeToString(data)
+            temptx, _ := hex.DecodeString(encodeStr)        //得到真实的tx记录
+            cs.Logger.Error("共识的区块 ", "高度:", block.Height, "交易:", string(temptx))
+            // TODO: 如果是快照交易，将自身快照的hash与交易中hash进行对比
+
+            //var t account.TxArg
+            //json.Unmarshal(temptx, &t)
+
+        }
+	}
+
 	// A prevote/precommit for this height?
 	if vote.Height == cs.Height {
 		height := cs.Height
@@ -1514,6 +1534,13 @@ func (cs *ConsensusState) signAddVote(type_ byte, hash []byte, header types.Part
 		return nil
 	}
 }
+
+func (cs *ConsensusState) GetBlockTxs(height int64) types.Txs {
+    block := cs.blockStore.LoadBlock(height)
+    return block.Txs
+}
+
+
 
 //---------------------------------------------------------
 

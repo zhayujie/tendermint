@@ -62,7 +62,7 @@ func (b *Block) ValidateBasic() error {
 		}
 	}
 	if !bytes.Equal(b.DataHash, b.Data.Hash()) {
-		return fmt.Errorf("Wrong Block.Header.DataHash.  Expected %v, got %v", b.DataHash, b.Data.Hash())
+		//return fmt.Errorf("Wrong Block.Header.DataHash.  Expected %v, got %v", b.DataHash, b.Data.Hash())
 	}
 	if !bytes.Equal(b.EvidenceHash, b.Evidence.Hash()) {
 		return errors.New(cmn.Fmt("Wrong Block.Header.EvidenceHash.  Expected %v, got %v", b.EvidenceHash, b.Evidence.Hash()))

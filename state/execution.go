@@ -1,7 +1,8 @@
 package state
 
 import (
-	"fmt"
+    "encoding/json"
+    "fmt"
 	"github.com/ebuchman/fail-test"
 	abci "github.com/tendermint/abci/types"
 	"github.com/tendermint/go-crypto"
@@ -98,6 +99,14 @@ func (blockExec *BlockExecutor) ApplyBlock(s State, blockID types.BlockID, block
 
 		// 快照生成v2.0
 		GenerateSnapshotFast(block.Height - 1)
+
+        // 在快照后一个区块内增加快照交易
+        snapshotTx := new(TxArg)
+        snapshotTx.TxType = "snapshots"
+        snapshotTx.Content = SnapshotHash
+        snapshotTxByte, _ := json.Marshal(snapshotTx)
+        block.Txs = append(block.Txs, snapshotTxByte)
+        block.NumTxs += 1;
 	}
 
 	if err := blockExec.ValidateBlock(s, block); err != nil {
@@ -250,7 +259,7 @@ func execBlockOnProxyApp(logger log.Logger, proxyAppConn proxy.AppConnConsensus,
 		if err := proxyAppConn.Error(); err != nil {
 			return nil, err
 		}
-
+        logger.Error("交易内容: ", "tx", string(tx))
 		/*
          * @Author: zyj
          * @Desc: update state
